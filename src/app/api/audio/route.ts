@@ -113,7 +113,7 @@ export async function POST(request: NextRequest) {
         const formData = await request.formData();
         const audioFile = formData.get('audio') as File;
         const sourceLanguage = formData.get('sourceLanguage') as string || 'en-US';
-        const targetLanguage = formData.get('targetLanguage') as string || 'es-US';
+        const targetLanguage = formData.get('outputLanguage') as string || 'es-US';
 
         if (!audioFile) {
             return NextResponse.json(

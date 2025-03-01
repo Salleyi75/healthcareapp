@@ -29,7 +29,7 @@ const popularLanguages = [
   { label: "Thai (Thailand)", value: "th-TH" },
 ];
 
-const AudioRecorder: React.FC = () => {
+const Page: React.FC = () => {
 
   const { permission } = useMicrophonePermission();
   const [isRecording, setIsRecording] = useState<boolean>(false);
@@ -102,7 +102,7 @@ const AudioRecorder: React.FC = () => {
 
   // Client-side code to send audio file with FormData using fetch
 
-  const sendAudioToAPI = async (audioBlob: Blob, languageCode: string = 'en-US'): Promise<{ success: boolean, originalText: string, translatedText: string, audioContent: string, fullResponse: unknown } | void> => {
+  const sendAudioToAPI = async (audioBlob: Blob, languageCode: string = 'en-US', outputLanguage: string = 'en-US'): Promise<{ success: boolean, originalText: string, translatedText: string, audioContent: string, fullResponse: unknown } | void> => {
     try {
       // Create a new FormData instance
       const formData = new FormData();
@@ -112,6 +112,7 @@ const AudioRecorder: React.FC = () => {
 
       // Add additional parameters
       formData.append('sourceLanguage', languageCode);
+      formData.append('outputLanguage', outputLanguage);
 
       // Send the request
       const response = await fetch('/api/audio', {
@@ -232,4 +233,4 @@ const AudioRecorder: React.FC = () => {
   );
 };
 
-export default AudioRecorder;
+export default Page;
