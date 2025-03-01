@@ -141,7 +141,7 @@ const Page: React.FC = () => {
   // Usage example
   const handleAudioUpload = async (audioBlob: Blob) => {
     try {
-      const result = await sendAudioToAPI(audioBlob, 'en-US');
+      const result = await sendAudioToAPI(audioBlob, inputLanguage, outputLanguage);
 
       if (result?.success) {
         updateTheThreeStates(`data:audio/mp3;base64,${result.audioContent}`, result.translatedText, result.originalText)
