@@ -2,7 +2,7 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
 
 // Define the possible permission states
-type PermissionState = "granted" | "denied" | "prompt" | "unknown";
+export type PermissionState = "granted" | "denied" | "prompt" | "unknown";
 
 // Define the context type
 interface MicrophonePermissionContextType {

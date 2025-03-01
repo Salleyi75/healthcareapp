@@ -1,12 +1,35 @@
 "use client"
 import React, { useState, useRef } from 'react';
 import { useMicrophonePermission } from './providers/microphonePermissionState';
+import { Select, Title } from '@mantine/core';
+import AudioCardElement from './component/AudioCardElement';
 
-interface AudioRecorderProps {
-  onRecordingComplete?: (audioBlob: Blob, audioUrl: string) => void;
-}
 
-const AudioRecorder: React.FC<AudioRecorderProps> = ({ onRecordingComplete }) => {
+
+const popularLanguages = [
+  { label: "English (United States)", value: "en-US" },
+  { label: "English (United Kingdom)", value: "en-GB" },
+  { label: "Spanish (Spain)", value: "es-ES" },
+  { label: "Spanish (Mexico)", value: "es-MX" },
+  { label: "French (France)", value: "fr-FR" },
+  { label: "German (Germany)", value: "de-DE" },
+  { label: "Chinese (Simplified, China)", value: "zh-CN" },
+  { label: "Chinese (Traditional, Taiwan)", value: "zh-TW" },
+  { label: "Japanese (Japan)", value: "ja-JP" },
+  { label: "Korean (South Korea)", value: "ko-KR" },
+  { label: "Arabic (Egypt)", value: "ar-EG" },
+  { label: "Hindi (India)", value: "hi-IN" },
+  { label: "Portuguese (Brazil)", value: "pt-BR" },
+  { label: "Portuguese (Portugal)", value: "pt-PT" },
+  { label: "Russian (Russia)", value: "ru-RU" },
+  { label: "Italian (Italy)", value: "it-IT" },
+  { label: "Dutch (Netherlands)", value: "nl-NL" },
+  { label: "Turkish (Turkey)", value: "tr-TR" },
+  { label: "Vietnamese (Vietnam)", value: "vi-VN" },
+  { label: "Thai (Thailand)", value: "th-TH" },
+];
+
+const AudioRecorder: React.FC = () => {
 
   const { permission } = useMicrophonePermission();
   const [isRecording, setIsRecording] = useState<boolean>(false);
@@ -14,7 +37,17 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ onRecordingComplete }) =>
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const streamRef = useRef<MediaStream | null>(null);
-  const [audioBlob, setAudioBlob] = useState<Blob | null>(null)
+  // const [_, setAudioBlob] = useState<Blob | null>(null)
+
+  const [isUploadingAudio, setIsUploadingAudio] = useState<boolean>(false)
+
+  const [transcribedText, setTranscribedText] = useState<string | null>(null)
+  const [translatedText, setTranslatedText] = useState<string | null>(null)
+  const [translatedAudio, setTranslatedAudio] = useState<string | null>(null);
+
+  const [inputLanguage, setInputLanguage] = useState<string>(popularLanguages[0].value)
+  const [outputLanguage, setOutputLanguage] = useState<string>(popularLanguages[3].value)
+
 
   const startRecording = async (): Promise<void> => {
     if (permission === "denied") {
@@ -23,6 +56,7 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ onRecordingComplete }) =>
     }
     try {
       audioChunksRef.current = [];
+      updateTheThreeStates(null, null, null)
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       streamRef.current = stream;
 
@@ -41,11 +75,10 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ onRecordingComplete }) =>
         const url = URL.createObjectURL(audioBlob);
         setAudioURL(url);
         console.log("AUDIO BLOB : ", audioBlob);
-        setAudioBlob(audioBlob)
-        if (onRecordingComplete) {
-          onRecordingComplete(audioBlob, url);
 
-        }
+        setIsUploadingAudio(true)
+        handleAudioUpload(audioBlob)
+          .finally(() => { setIsUploadingAudio(false) })
       };
 
       mediaRecorder.start();
@@ -69,7 +102,7 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ onRecordingComplete }) =>
 
   // Client-side code to send audio file with FormData using fetch
 
-  const sendAudioToAPI = async (audioBlob: Blob, languageCode: string = 'en-US'): Promise<unknown> => {
+  const sendAudioToAPI = async (audioBlob: Blob, languageCode: string = 'en-US'): Promise<{ success: boolean, originalText: string, translatedText: string, audioContent: string, fullResponse: unknown } | void> => {
     try {
       // Create a new FormData instance
       const formData = new FormData();
@@ -78,7 +111,7 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ onRecordingComplete }) =>
       formData.append('audio', audioBlob, 'recording.wav');
 
       // Add additional parameters
-      formData.append('languageCode', languageCode);
+      formData.append('sourceLanguage', languageCode);
 
       // Send the request
       const response = await fetch('/api/audio', {
@@ -94,15 +127,27 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ onRecordingComplete }) =>
       return await response.json();
     } catch (error) {
       console.error('Error sending audio:', error);
-      throw error;
+      // throw error;
     }
   };
+
+  const updateTheThreeStates = (translatedAudio: string | null, translatedText: string | null, transcribedText: string | null) => {
+    setTranslatedAudio(translatedAudio ? `${translatedAudio}` : null)
+    setTranscribedText(transcribedText)
+    setTranslatedText(translatedText)
+  }
 
   // Usage example
   const handleAudioUpload = async (audioBlob: Blob) => {
     try {
       const result = await sendAudioToAPI(audioBlob, 'en-US');
-      console.log('Transcription:', result);
+
+      if (result?.success) {
+        updateTheThreeStates(`data:audio/mp3;base64,${result.audioContent}`, result.translatedText, result.originalText)
+      } else {
+        alert("Something went wrong, try again or contact suppport")
+      }
+
       return result;
     } catch (error) {
       console.error('Failed to transcribe audio:', error);
@@ -124,54 +169,65 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ onRecordingComplete }) =>
   // )
 
   return (
-    <div className="flex flex-col items-center p-4 bg-white rounded-lg shadow">
-      <div className="w-full mb-4">
-        <h1 className='text-black m-auto w-fit '>Microphone Permission State : {permission} </h1>
-        <div className="flex justify-center space-x-4">
-          {!isRecording ? (
-            <button
-              onClick={startRecording}
-              className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition"
-              type="button"
-            >
-              Start Recording
-            </button>
-          ) : (
-            <button
-              onClick={stopRecording}
-              className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg transition"
-              type="button"
-            >
-              Stop Recording
-            </button>
-          )}
-        </div>
-      </div>
+    <div className='grid content-center justify-center h-[100vh] max-h-[100vh]'>
+      <Title order={1} ta="center" >Healthcare Translation App</Title>
+      <div className="flex flex-col items-center p-4 gap-3 bg-white rounded-lg shadow">
 
-      {audioURL && (
-        <div className="w-full mt-4">
-          <h3 className="text-lg font-medium mb-2">Recorded Audio:</h3>
-          <audio controls src={audioURL} className="w-full" />
-          <button
-            onClick={() => {
-              if (audioBlob) {
-                handleAudioUpload(audioBlob).then((success) => {
-                  console.log("POSTED SUCCESS : ", success);
-                },
-                  (error) => {
-                    console.log("POSTED ERROR : ", error)
-                  }
-                )
-              }
+        <div className='flex flex-row gap-2'>
+          <Select label="Input language" defaultValue={inputLanguage} data={
+            popularLanguages
+          } size='xs'
+            onChange={(value) => {
+              setInputLanguage(value ?? '')
             }}
-            className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition"
-            type="button"
-          >
-            Post Audio
-          </button>
+          />
+          <Select label="output language" defaultValue={outputLanguage} data={
+            popularLanguages
+          } size='xs'
+            onChange={
+              (value) => {
+                setOutputLanguage(value ?? '')
+              }
+            }
+          />
         </div>
 
-      )}
+        {/* Recorded Audio */}
+        <AudioCardElement title='Recorded Audio' audioURL={audioURL ?? undefined} isLoading={isRecording || isUploadingAudio} transcript={transcribedText ?? undefined} />
+
+        {/* Translated Audio */}
+        {
+          translatedAudio &&
+          <AudioCardElement title='Translated Audio' audioURL={`${translatedAudio}`} isLoading={false} transcript={translatedText ?? undefined} />}
+
+
+
+        <div className="w-full mb-4">
+
+          <div className="flex justify-center space-x-4">
+            {!isRecording ? (
+              <button
+                onClick={startRecording}
+                className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition"
+                type="button"
+              >
+                Start Recording
+              </button>
+            ) : (
+              <button
+                onClick={stopRecording}
+                className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg transition"
+                type="button"
+              >
+                Stop Recording
+              </button>
+            )}
+          </div>
+          {!(["prompt", "granted"].includes(permission)) && <p className='text-black m-auto w-fit '>Please allow microphone permission</p>}
+        </div>
+
+
+      </div >
     </div>
   );
 };
